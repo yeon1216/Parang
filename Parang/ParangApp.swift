@@ -6,12 +6,21 @@
 //
 
 import SwiftUI
+import ComposableArchitecture
 
 @main
-struct ParangApp: App {
+struct KSYPhotosApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            RootView(
+                store: Store(
+                    initialState: Root.State(
+                        path: StackState([.screenHome()])
+                    )
+                ) {
+                    Root()
+                }
+            )
         }
     }
 }
