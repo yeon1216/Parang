@@ -41,10 +41,21 @@ struct HomeView: View {
     var body: some View {
         WithViewStore(self.store, observe: { $0 }) { viewStore in
             ZStack {
-                //                Color.nenioWhite.ignoresSafeArea(.all)
-                Text("Home")
+                VStack {
+                    Text("Home")
+                    
+                    Button(action: {
+                        viewStore.send(.tapSetting)
+                    }) {
+                        Text("Go to Settings")
+                            .padding()
+                            .background(Color.blue)
+                            .foregroundColor(.white)
+                            .cornerRadius(8)
+                    }
+                }
             }
-            .ignoresSafeArea(.all)
+//            .ignoresSafeArea(.all)
             .navigationBarBackButtonHidden(true)
         }
     }

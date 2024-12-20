@@ -11,23 +11,21 @@ import ComposableArchitecture
 @Reducer
 struct Setting {
     struct State: Equatable {
-        var loading = false
     }
     
     enum Action {
         case onAppear
+        case tapBack
     }
-    
-    @Dependency(\.continuousClock) var clock
     
     func reduce(into state: inout State, action: Action) -> Effect<Action> {
         switch action {
         case .onAppear:
             return .none
+        case .tapBack:
+            return .none
         }
-        
     }
-    
 }
 
 struct SettingView: View {
@@ -38,18 +36,27 @@ struct SettingView: View {
     var body: some View {
         WithViewStore(self.store, observe: { $0 }) { viewStore in
             ZStack {
-//                Color.nenioWhite.ignoresSafeArea(.all)
-                Image("ic_nenio_characters")
-                    .renderingMode(.original)
-                    .resizable()
-                    .frame(width: 184, height: 172.8)
-                    .onAppear {
-                        guard !appeared else { return }
-                        appeared = true
-                        viewStore.send(.onAppear)
+                VStack {
+                    HStack {
+                        Button(action: {
+                            viewStore.send(.tapBack)
+                        }) {
+                            Image(systemName: "chevron.left")
+                                .foregroundColor(.blue)
+                                .imageScale(.large)
+                        }
+                        .padding()
+                        Spacer()
                     }
+                    
+                    Spacer()
+                    
+                    Text("Settings")
+                    
+                    Spacer()
+                }
             }
-            .ignoresSafeArea(.all)
+//            .ignoresSafeArea(.all)
             .navigationBarBackButtonHidden(true)
         }
     }

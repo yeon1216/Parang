@@ -36,6 +36,9 @@ struct Root {
                 case .element(id: _, action: .screenHome(.tapSetting)):
                     state.path.append(.screenSetting())
                     return .none
+                case .element(id: _, action: .screenSetting(.tapBack)):
+                    state.path.removeLast()
+                    return .none
                 default:
                     return .none
                 }
