@@ -9,7 +9,8 @@ import SwiftUI
 import ComposableArchitecture
 
 @main
-struct KSYPhotosApp: App {
+struct ParangApp: App {
+    
     var body: some Scene {
         WindowGroup {
             RootView(
