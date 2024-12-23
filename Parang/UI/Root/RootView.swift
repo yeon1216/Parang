@@ -36,7 +36,13 @@ struct Root {
                 case .element(id: _, action: .screenHome(.tapSetting)):
                     state.path.append(.screenSetting())
                     return .none
+                case .element(id: _, action: .screenHome(.tapCamera)):
+                    state.path.append(.screenCamera())
+                    return .none
                 case .element(id: _, action: .screenSetting(.tapBack)):
+                    state.path.removeLast()
+                    return .none
+                case .element(id: _, action: .screenCamera(.tapBack)):
                     state.path.removeLast()
                     return .none
                 default:
@@ -57,11 +63,13 @@ struct Root {
         enum State: Equatable {
             case screenHome(Home.State = .init())
             case screenSetting(Setting.State = .init())
+            case screenCamera(ParangCamera.State = .init())
         }
         
         enum Action {
             case screenHome(Home.Action)
             case screenSetting(Setting.Action)
+            case screenCamera(ParangCamera.Action)
         }
         
         var body: some Reducer<State, Action> {
@@ -70,6 +78,9 @@ struct Root {
             }
             Scope(state: \.screenSetting, action: \.screenSetting) {
                 Setting()
+            }
+            Scope(state: \.screenCamera, action: \.screenCamera) {
+                ParangCamera()
             }
         }
     }
@@ -108,6 +119,12 @@ struct RootView: View {
                     /Root.Path.State.screenSetting,
                      action: Root.Path.Action.screenSetting,
                      then: { SettingView(store: $0) }
+                )
+            case .screenCamera:
+                CaseLet(
+                    /Root.Path.State.screenCamera,
+                    action: Root.Path.Action.screenCamera,
+                    then: ParangCameraView.init(store:)
                 )
             }
         }

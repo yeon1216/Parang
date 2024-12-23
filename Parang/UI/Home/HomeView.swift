@@ -17,6 +17,7 @@ struct Home {
     enum Action {
         case onAppear
         case tapSetting
+        case tapCamera
     }
     
     @Dependency(\.continuousClock) var clock
@@ -26,6 +27,8 @@ struct Home {
         case .onAppear:
             return .none
         case .tapSetting:
+            return .none
+        case .tapCamera:
             return .none
         }
         
@@ -53,6 +56,17 @@ struct HomeView: View {
                             .foregroundColor(.white)
                             .cornerRadius(8)
                     }
+                    
+                    Button(action: {
+                        viewStore.send(.tapCamera)
+                    }) {
+                        Text("Open Camera")
+                            .padding()
+                            .background(Color.blue)
+                            .foregroundColor(.white)
+                            .cornerRadius(8)
+                    }
+                    .padding(.top)
                 }
             }
 //            .ignoresSafeArea(.all)
