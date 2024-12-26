@@ -40,8 +40,13 @@ struct ParangCamera {
         Reduce { state, action in
             switch action {
             case .onAppear:
-                return .send(.requestCameraPermission)
-                
+                let status = AVCaptureDevice.authorizationStatus(for: .video)
+                if status == .authorized {
+                    state.cameraPermissionGranted = true
+                    return .none
+                } else {
+                    return .send(.requestCameraPermission)
+                }
             case .requestCameraPermission:
                 return .run { send in
                     let granted = await AVCaptureDevice.requestAccess(for: .video)
@@ -177,6 +182,7 @@ struct ParangCameraView: View {
                 }
             }
             .onAppear { viewStore.send(.onAppear) }
+            .navigationBarBackButtonHidden(true)
         }
     }
     
@@ -195,6 +201,7 @@ struct CameraPreviewView: UIViewRepresentable {
     
     func makeUIView(context: Context) -> UIView {
         let view = UIView(frame: .zero)
+//        let view = UIView(frame: CGRect(x: 0, y: 0, width: UIScreen.main.bounds.width, height: UIScreen.main.bounds.height))
         
         // Configure camera session
         session.beginConfiguration()
@@ -233,8 +240,20 @@ struct CameraPreviewView: UIViewRepresentable {
     }
     
     func updateUIView(_ uiView: UIView, context: Context) {
-        if let previewLayer = uiView.layer.sublayers?.first as? AVCaptureVideoPreviewLayer {
-            previewLayer.frame = uiView.bounds
+//        if let previewLayer = uiView.layer.sublayers?.first as? AVCaptureVideoPreviewLayer {
+//            previewLayer.frame = uiView.bounds
+//        }
+//        DispatchQueue.main.async {
+//            if let previewLayer = uiView.layer.sublayers?.first as? AVCaptureVideoPreviewLayer {
+//                previewLayer.frame = uiView.bounds
+//            }
+//        }
+        Task {
+            await MainActor.run {
+                if let previewLayer = uiView.layer.sublayers?.first as? AVCaptureVideoPreviewLayer {
+                    previewLayer.frame = uiView.bounds
+                }
+            }
         }
     }
     
