@@ -40,7 +40,7 @@ struct Root {
                     state.path.append(.screenCamera())
                     return .none
                 case .element(id: _, action: .screenHome(.tapEditor)):
-                    state.path.append(.screenEditor())
+                    state.path.append(.screenVideoPicker())
                     return .none
                 case .element(id: _, action: .screenSetting(.tapBack)):
                     state.path.removeLast()
@@ -50,6 +50,14 @@ struct Root {
                     return .none
                 case .element(id: _, action: .screenEditor(.tapBack)):
                     state.path.removeLast()
+                    return .none
+                case .element(id: _, action: .screenVideoPicker(.tapBack)):
+                    state.path.removeLast()
+                    return .none
+                case .element(id: _, action: .screenVideoPicker(.proceedToEditor(let url))):
+                    if let url {
+                        state.path.append(.screenEditor(ParangEditor.State(selectedVideo: url)))
+                    }
                     return .none
                 default:
                     return .none
@@ -71,6 +79,7 @@ struct Root {
             case screenSetting(Setting.State = .init())
             case screenCamera(ParangCamera.State = .init())
             case screenEditor(ParangEditor.State = .init())
+            case screenVideoPicker(ParangVideoPicker.State = .init())
         }
         
         enum Action {
@@ -78,6 +87,7 @@ struct Root {
             case screenSetting(Setting.Action)
             case screenCamera(ParangCamera.Action)
             case screenEditor(ParangEditor.Action)
+            case screenVideoPicker(ParangVideoPicker.Action)
         }
         
         var body: some Reducer<State, Action> {
@@ -92,6 +102,9 @@ struct Root {
             }
             Scope(state: \.screenEditor, action: \.screenEditor) {
                 ParangEditor()
+            }
+            Scope(state: \.screenVideoPicker, action: \.screenVideoPicker) {
+                ParangVideoPicker()
             }
         }
     }
@@ -142,6 +155,12 @@ struct RootView: View {
                     /Root.Path.State.screenEditor,
                     action: Root.Path.Action.screenEditor,
                     then: ParangEditorView.init(store:)
+                )
+            case .screenVideoPicker:
+                CaseLet(
+                    /Root.Path.State.screenVideoPicker,
+                    action: Root.Path.Action.screenVideoPicker,
+                    then: ParangVideoPickerView.init(store:)
                 )
             }
         }

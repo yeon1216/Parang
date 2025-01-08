@@ -10,6 +10,13 @@ struct ParangEditor {
         var isVideoPickerPresented = false
         var player: AVPlayer?
         
+        init(selectedVideo: URL? = nil) {
+            self.selectedVideo = selectedVideo
+            if let url = selectedVideo {
+                self.player = AVPlayer(url: url)
+            }
+        }
+        
         static func == (lhs: State, rhs: State) -> Bool {
             lhs.selectedVideo == rhs.selectedVideo &&
             lhs.isVideoPickerPresented == rhs.isVideoPickerPresented
@@ -80,7 +87,12 @@ struct ParangEditorView: View {
                     // Video Preview
                     if let player = viewStore.player {
                         VideoPlayer(player: player)
-                            .edgesIgnoringSafeArea(.all)
+                            .onAppear {
+                                player.play()
+                            }
+                            .onDisappear {
+                                player.pause()
+                            }
                     } else {
                         VStack {
                             Image(systemName: "video.fill")
