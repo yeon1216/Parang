@@ -7,6 +7,8 @@ struct ParangVideoPicker {
     struct State: Equatable {
         var selectedVideo: PhotosPickerItem?
         var isLoading = false
+        var showError = false
+        var errorMessage = ""
     }
     
     enum Action {
@@ -15,6 +17,8 @@ struct ParangVideoPicker {
         case videoSelected(PhotosPickerItem?)
         case proceedToEditor(URL?)
         case setLoading(Bool)
+        case setError(message: String)
+        case dismissError
     }
     
     var body: some Reducer<State, Action> {
@@ -31,12 +35,17 @@ struct ParangVideoPicker {
                 state.isLoading = true
                 
                 return .run { [item] send in
-                    if let item {
-                        if let videoURL = try? await item.loadTransferable(type: VideoURL.self) {
-                            await send(.proceedToEditor(videoURL.url))
-                        } else {
-                            await send(.proceedToEditor(nil))
-                        }
+                    guard let item else { 
+                        await send(.setLoading(false))
+                        return 
+                    }
+                    
+                    do {
+                        let videoURL = try await item.loadTransferable(type: VideoURL.self)
+                        await send(.proceedToEditor(videoURL?.url))
+                    } catch {
+                        print("Video loading error:", error)
+                        await send(.setError(message: "Failed to load video. Please try again."))
                     }
                     await send(.setLoading(false))
                 }
@@ -46,6 +55,16 @@ struct ParangVideoPicker {
                 
             case let .setLoading(isLoading):
                 state.isLoading = isLoading
+                return .none
+                
+            case let .setError(message):
+                state.showError = true
+                state.errorMessage = message
+                return .none
+                
+            case .dismissError:
+                state.showError = false
+                state.errorMessage = ""
                 return .none
             }
         }
@@ -117,6 +136,19 @@ struct ParangVideoPickerView: View {
                 }
             }
             .navigationBarBackButtonHidden(true)
+            .alert(
+                "Error",
+                isPresented: viewStore.binding(
+                    get: \.showError,
+                    send: { _ in .dismissError }
+                )
+            ) {
+                Button("OK") {
+                    viewStore.send(.dismissError)
+                }
+            } message: {
+                Text(viewStore.errorMessage)
+            }
         }
     }
 }
@@ -127,4 +159,4 @@ struct ParangVideoPickerView: View {
             ParangVideoPicker()
         }
     )
-} 
+}

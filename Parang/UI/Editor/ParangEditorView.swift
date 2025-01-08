@@ -7,8 +7,8 @@ import PhotosUI
 struct ParangEditor {
     struct State: Equatable {
         var selectedVideo: URL?
-        var isVideoPickerPresented = false
         var player: AVPlayer?
+        var isLoading = false
         
         init(selectedVideo: URL? = nil) {
             self.selectedVideo = selectedVideo
@@ -18,43 +18,35 @@ struct ParangEditor {
         }
         
         static func == (lhs: State, rhs: State) -> Bool {
-            lhs.selectedVideo == rhs.selectedVideo &&
-            lhs.isVideoPickerPresented == rhs.isVideoPickerPresented
+            lhs.selectedVideo == rhs.selectedVideo
         }
     }
     
     enum Action {
         case onAppear
         case tapBack
-        case tapSelectVideo
-        case videoSelected(URL?)
-        case setVideoPickerPresented(Bool)
+        case videoPlayerOnAppear
+        case videoPlayerOnDisappear
     }
     
     var body: some Reducer<State, Action> {
         Reduce { state, action in
             switch action {
             case .onAppear:
+                state.isLoading = true
                 return .none
                 
             case .tapBack:
                 return .none
                 
-            case .tapSelectVideo:
-                state.isVideoPickerPresented = true
+            case .videoPlayerOnAppear:
+                state.player?.play()
+                state.isLoading = false
+                
                 return .none
                 
-            case let .videoSelected(url):
-                state.selectedVideo = url
-                if let url {
-                    state.player = AVPlayer(url: url)
-                } else {
-                    state.player = nil
-                }
-                return .none
-                
-            case let .setVideoPickerPresented(isPresented):
-                state.isVideoPickerPresented = isPresented
+            case .videoPlayerOnDisappear:
+                state.player?.pause()
                 return .none
             }
         }
@@ -71,7 +63,28 @@ struct ParangEditorView: View {
                 Color.black.edgesIgnoringSafeArea(.all)
                 
                 VStack {
-                    // Navigation Bar
+                    // Video Preview
+                    if let player = viewStore.player {
+                        VideoPlayer(player: player)
+                            .onAppear {
+                                viewStore.send(.videoPlayerOnAppear)
+                            }
+                            .onDisappear {
+                                viewStore.send(.videoPlayerOnDisappear)
+                            }
+                    }
+                }
+                
+                if viewStore.isLoading {
+                    Color.black.opacity(0.5)
+                        .edgesIgnoringSafeArea(.all)
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        .scaleEffect(1.5)
+                }
+                
+                // Navigation Bar
+                VStack {
                     HStack {
                         Button(action: { viewStore.send(.tapBack) }) {
                             Image(systemName: "xmark")
@@ -83,57 +96,14 @@ struct ParangEditorView: View {
                         Spacer()
                     }
                     .padding(.horizontal)
-                    
-                    // Video Preview
-                    if let player = viewStore.player {
-                        VideoPlayer(player: player)
-                            .onAppear {
-                                player.play()
-                            }
-                            .onDisappear {
-                                player.pause()
-                            }
-                    } else {
-                        VStack {
-                            Image(systemName: "video.fill")
-                                .font(.system(size: 40))
-                                .foregroundColor(.white)
-                                .padding()
-                            
-                            Text("No video selected")
-                                .foregroundColor(.white)
-                        }
-                    }
-                    
-                    // Bottom Controls
-                    HStack {
-                        PhotosPicker(
-                            selection: $photosPickerItem,
-                            matching: .videos,
-                            photoLibrary: .shared()
-                        ) {
-                            Text("Select Video")
-                                .foregroundColor(.white)
-                                .padding()
-                                .background(Color.blue)
-                                .cornerRadius(8)
-                        }
-                        .onChange(of: photosPickerItem) { _, newValue in
-                            Task {
-                                if let newValue {
-                                    if let videoURL = try? await newValue.loadTransferable(type: VideoURL.self) {
-                                        await MainActor.run {
-                                            viewStore.send(.videoSelected(videoURL.url))
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    .padding(.bottom, 30)
+                    Spacer()
                 }
+
             }
             .navigationBarBackButtonHidden(true)
+            .onAppear {
+                viewStore.send(.onAppear)
+            }
         }
     }
 }
@@ -146,14 +116,18 @@ struct VideoURL: Transferable {
         FileRepresentation(contentType: .movie) { video in
             SentTransferredFile(video.url)
         } importing: { received in
-            let copy = URL.documentsDirectory.appending(path: "video-\(UUID().uuidString).mov")
+            let documentDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            let destinationURL = documentDirectory.appendingPathComponent("video-\(UUID().uuidString).mov")
             
-            if FileManager.default.fileExists(atPath: copy.path()) {
-                try FileManager.default.removeItem(at: copy)
+            // 이미 파일이 있다면 삭제
+            if FileManager.default.fileExists(atPath: destinationURL.path) {
+                try FileManager.default.removeItem(at: destinationURL)
             }
             
-            try FileManager.default.copyItem(at: received.file, to: copy)
-            return Self.init(url: copy)
+            // 파일 복사
+            try FileManager.default.copyItem(at: received.file, to: destinationURL)
+            
+            return Self.init(url: destinationURL)
         }
     }
 }
@@ -164,4 +138,4 @@ struct VideoURL: Transferable {
             ParangEditor()
         }
     )
-} 
+}

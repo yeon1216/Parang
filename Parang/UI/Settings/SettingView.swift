@@ -31,7 +31,6 @@ struct Setting {
 struct SettingView: View {
     
     let store: StoreOf<Setting>
-    @State private var appeared = false
     
     var body: some View {
         WithViewStore(self.store, observe: { $0 }) { viewStore in
