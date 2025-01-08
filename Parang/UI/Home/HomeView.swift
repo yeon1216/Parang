@@ -18,6 +18,7 @@ struct Home {
         case onAppear
         case tapSetting
         case tapCamera
+        case tapEditor
     }
     
     @Dependency(\.continuousClock) var clock
@@ -29,6 +30,8 @@ struct Home {
         case .tapSetting:
             return .none
         case .tapCamera:
+            return .none
+        case .tapEditor:
             return .none
         }
         
@@ -61,6 +64,17 @@ struct HomeView: View {
                         viewStore.send(.tapCamera)
                     }) {
                         Text("Open Camera")
+                            .padding()
+                            .background(Color.blue)
+                            .foregroundColor(.white)
+                            .cornerRadius(8)
+                    }
+                    .padding(.top)
+                    
+                    Button(action: {
+                        viewStore.send(.tapEditor)
+                    }) {
+                        Text("Open Editor")
                             .padding()
                             .background(Color.blue)
                             .foregroundColor(.white)

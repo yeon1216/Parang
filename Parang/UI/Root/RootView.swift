@@ -39,10 +39,16 @@ struct Root {
                 case .element(id: _, action: .screenHome(.tapCamera)):
                     state.path.append(.screenCamera())
                     return .none
+                case .element(id: _, action: .screenHome(.tapEditor)):
+                    state.path.append(.screenEditor())
+                    return .none
                 case .element(id: _, action: .screenSetting(.tapBack)):
                     state.path.removeLast()
                     return .none
                 case .element(id: _, action: .screenCamera(.tapBack)):
+                    state.path.removeLast()
+                    return .none
+                case .element(id: _, action: .screenEditor(.tapBack)):
                     state.path.removeLast()
                     return .none
                 default:
@@ -64,12 +70,14 @@ struct Root {
             case screenHome(Home.State = .init())
             case screenSetting(Setting.State = .init())
             case screenCamera(ParangCamera.State = .init())
+            case screenEditor(ParangEditor.State = .init())
         }
         
         enum Action {
             case screenHome(Home.Action)
             case screenSetting(Setting.Action)
             case screenCamera(ParangCamera.Action)
+            case screenEditor(ParangEditor.Action)
         }
         
         var body: some Reducer<State, Action> {
@@ -81,6 +89,9 @@ struct Root {
             }
             Scope(state: \.screenCamera, action: \.screenCamera) {
                 ParangCamera()
+            }
+            Scope(state: \.screenEditor, action: \.screenEditor) {
+                ParangEditor()
             }
         }
     }
@@ -125,6 +136,12 @@ struct RootView: View {
                     /Root.Path.State.screenCamera,
                     action: Root.Path.Action.screenCamera,
                     then: ParangCameraView.init(store:)
+                )
+            case .screenEditor:
+                CaseLet(
+                    /Root.Path.State.screenEditor,
+                    action: Root.Path.Action.screenEditor,
+                    then: ParangEditorView.init(store:)
                 )
             }
         }
