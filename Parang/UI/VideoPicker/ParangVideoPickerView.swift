@@ -41,11 +41,15 @@ struct ParangVideoPicker {
                     }
                     
                     do {
-                        let videoURL = try await item.loadTransferable(type: VideoURL.self)
-                        await send(.proceedToEditor(videoURL?.url))
+                        let movie = try await item.loadTransferable(type: Movie.self)
+                        if let movie {
+                            await send(.proceedToEditor(movie.url))
+                        } else {
+                            await send(.setError(message: "Failed to load video. Please try a different video."))
+                        }
                     } catch {
                         print("Video loading error:", error)
-                        await send(.setError(message: "Failed to load video. Please try again."))
+                        await send(.setError(message: error.localizedDescription))
                     }
                     await send(.setLoading(false))
                 }

@@ -108,14 +108,11 @@ struct ParangEditorView: View {
     }
 }
 
-// Helper struct to load video URL from PhotosPickerItem
-struct VideoURL: Transferable {
+struct Movie: Transferable {
     let url: URL
     
     static var transferRepresentation: some TransferRepresentation {
-        FileRepresentation(contentType: .movie) { video in
-            SentTransferredFile(video.url)
-        } importing: { received in
+        DataRepresentation(importedContentType: .movie) { data in
             let documentDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
             let destinationURL = documentDirectory.appendingPathComponent("video-\(UUID().uuidString).mov")
             
@@ -124,10 +121,9 @@ struct VideoURL: Transferable {
                 try FileManager.default.removeItem(at: destinationURL)
             }
             
-            // 파일 복사
-            try FileManager.default.copyItem(at: received.file, to: destinationURL)
-            
-            return Self.init(url: destinationURL)
+            // 데이터 저장
+            try data.write(to: destinationURL)
+            return Movie(url: destinationURL)
         }
     }
 }
