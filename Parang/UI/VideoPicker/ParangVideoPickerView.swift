@@ -1,6 +1,7 @@
 import SwiftUI
 import ComposableArchitecture
 import PhotosUI
+import UniformTypeIdentifiers
 
 @Reducer
 struct ParangVideoPicker {
@@ -40,12 +41,34 @@ struct ParangVideoPicker {
                         return 
                     }
                     
-                    do {
-                        let movie = try await item.loadTransferable(type: Movie.self)
-                        if let movie {
-                            await send(.proceedToEditor(movie.url))
+                    let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+                    
+                    var isAuthorized: Bool = false
+                    
+                    if status == .notDetermined {
+                        let granted = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
+                        if granted == .authorized {
+                            isAuthorized = true
                         } else {
-                            await send(.setError(message: "Failed to load video. Please try a different video."))
+                            isAuthorized = false
+                        }
+                    }
+                    
+                    do {
+                        if status == .authorized || isAuthorized {
+                            let movie = try await item.loadTransferable(type: VideoURL.self)
+                            if let movie {
+                                await send(.proceedToEditor(movie.url))
+                            } else {
+                                await send(.setError(message: "Failed to copy video."))
+                            }
+                        } else {
+                            let movie = try await item.loadTransferable(type: Movie.self)
+                            if let movie {
+                                await send(.proceedToEditor(movie.url))
+                            } else {
+                                await send(.setError(message: "Failed to load video. Please try a different video."))
+                            }
                         }
                     } catch {
                         print("Video loading error:", error)
@@ -163,4 +186,66 @@ struct ParangVideoPickerView: View {
             ParangVideoPicker()
         }
     )
+}
+
+struct Movie: Transferable {
+    let url: URL
+    
+    static var transferRepresentation: some TransferRepresentation {
+        DataRepresentation(importedContentType: .movie) { data in
+            let videoDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("videos")
+            
+            // videos 디렉토리가 없다면 생성
+            if !FileManager.default.fileExists(atPath: videoDirectory.path) {
+                try FileManager.default.createDirectory(at: videoDirectory, withIntermediateDirectories: true)
+            }
+            
+            let videoURL = videoDirectory.appendingPathComponent("video-\(UUID().uuidString).mov")
+            print("로그 ::: transferRepresentation videoURL: \(videoURL)")
+            
+            // 이미 파일이 있다면 삭제
+            if FileManager.default.fileExists(atPath: videoURL.path) {
+                try FileManager.default.removeItem(at: videoURL)
+            }
+            
+            // 데이터를 임시 파일로 저장
+            let temporaryURL = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+            try data.write(to: temporaryURL)
+            
+            do {
+                // 임시 파일을 최종 위치로 이동
+                try FileManager.default.moveItem(at: temporaryURL, to: videoURL)
+                print("로그 ::: 파일 이동 성공")
+            } catch {
+                print("로그 ::: 파일 이동 실패:", error)
+                // 이동 실패시 데이터를 직접 쓰기
+                try data.write(to: videoURL)
+            }
+            
+            return Movie(url: videoURL)
+        }
+    }
+}
+
+struct VideoURL: Transferable {
+    let url: URL
+    
+    static var transferRepresentation: some TransferRepresentation {
+        FileRepresentation(contentType: .movie) { video in
+            SentTransferredFile(video.url)
+        } importing: { received in
+            let videoDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("videos")
+            let videoURL = videoDirectory.appendingPathComponent("video-\(UUID().uuidString).mov")
+            
+            // 이미 파일이 있다면 삭제
+            if FileManager.default.fileExists(atPath: videoURL.path) {
+                try FileManager.default.removeItem(at: videoURL)
+            }
+            
+            // 파일 복사
+            try FileManager.default.copyItem(at: received.file, to: videoURL)
+            
+            return Self.init(url: videoURL)
+        }
+    }
 }
