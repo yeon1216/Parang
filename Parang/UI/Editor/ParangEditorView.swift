@@ -42,7 +42,6 @@ struct ParangEditor {
             case .videoPlayerOnAppear:
                 state.player?.play()
                 state.isLoading = false
-                
                 return .none
                 
             case .videoPlayerOnDisappear:
@@ -55,7 +54,6 @@ struct ParangEditor {
 
 struct ParangEditorView: View {
     let store: StoreOf<ParangEditor>
-    @State private var photosPickerItem: PhotosPickerItem?
     
     var body: some View {
         WithViewStore(self.store, observe: { $0 }) { viewStore in
@@ -63,9 +61,8 @@ struct ParangEditorView: View {
                 Color.black.edgesIgnoringSafeArea(.all)
                 
                 VStack {
-                    // Video Preview
                     if let player = viewStore.player {
-                        VideoPlayer(player: player)
+                        MetalVideoView(player: player)
                             .onAppear {
                                 viewStore.send(.videoPlayerOnAppear)
                             }
@@ -96,9 +93,9 @@ struct ParangEditorView: View {
                         Spacer()
                     }
                     .padding(.horizontal)
+                    
                     Spacer()
                 }
-
             }
             .navigationBarBackButtonHidden(true)
             .onAppear {
