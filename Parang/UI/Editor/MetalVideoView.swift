@@ -122,7 +122,15 @@ struct MetalVideoView: UIViewRepresentable {
         /// Metal 뷰가 새로운 프레임을 그려야 할 때 호출되는 메서드
         func draw(in view: MTKView) {
             guard let pixelBuffer = currentPixelBuffer else { return }
-            renderer.render(pixelBuffer: pixelBuffer, in: view)
+            
+            let orientation: UIInterfaceOrientation
+            if #available(iOS 15.0, *) {
+                orientation = view.window?.windowScene?.interfaceOrientation ?? .portrait
+            } else {
+                orientation = UIApplication.shared.windows.first?.windowScene?.interfaceOrientation ?? .portrait
+            }
+            
+            renderer.render(pixelBuffer: pixelBuffer, in: view, orientation: orientation)
         }
     }
-} 
+}

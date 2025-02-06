@@ -218,4 +218,127 @@ class VideoRenderer: NSObject {
         commandBuffer.present(drawable)
         commandBuffer.commit()
     }
-} 
+    
+    /// 비디오 프레임을 화면에 렌더링
+    /// - Parameters:
+    ///   - pixelBuffer: AVPlayer로부터 받은 비디오 프레임
+    ///   - view: 렌더링될 Metal 뷰
+    func render(pixelBuffer: CVPixelBuffer, in view: MTKView, orientation: UIInterfaceOrientation) {
+        // 필요한 Metal 객체들이 모두 유효한지 확인
+        guard let drawable = view.currentDrawable,
+              let renderPassDescriptor = view.currentRenderPassDescriptor,
+              let commandBuffer = metalCommandQueue.makeCommandBuffer(),
+              let renderEncoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPassDescriptor),
+              let pipelineState = renderPipelineState,
+              let vertexBuffer = vertexBuffer else {
+            return
+        }
+        
+        // 비디오 프레임의 크기 가져오기
+        let videoWidth = Float(CVPixelBufferGetWidth(pixelBuffer))
+        let videoHeight = Float(CVPixelBufferGetHeight(pixelBuffer))
+        let videoAspect = videoWidth / videoHeight
+        
+        // 뷰의 크기 가져오기
+        let viewWidth = Float(view.drawableSize.width)
+        let viewHeight = Float(view.drawableSize.height)
+        let viewAspect = viewWidth / viewHeight
+        
+        // 1. orientation에 따른 회전 각도 설정
+        let angle: Float = {
+            switch orientation {
+            case .portrait:
+                return 0
+            case .portraitUpsideDown:
+                return Float.pi
+            case .landscapeLeft:
+                return Float.pi / 2
+            case .landscapeRight:
+                return -Float.pi / 2
+            default:
+                return 0
+            }
+        }()
+        
+        // 2. 회전 90°(또는 -90°)인 경우 영상의 가로세로 비율은 역수가 되어야 함
+        let effectiveVideoAspect: Float = (abs(angle) == Float.pi/2) ? (1 / videoAspect) : videoAspect
+        
+        // 3. 뷰에 맞추기 위한 스케일 계산 (letterbox 방식)
+        var scaleX: Float = 1.0
+        var scaleY: Float = 1.0
+        if effectiveVideoAspect > viewAspect {
+            // 영상이 뷰보다 더 와이드한 경우 : 세로 스케일 조정
+            scaleY = viewAspect / effectiveVideoAspect
+        } else {
+            // 뷰가 더 와이드한 경우 : 가로 스케일 조정
+            scaleX = effectiveVideoAspect / viewAspect
+        }
+        
+        // 4. 회전 전 원본 버텍스 좌표 계산 (중심이 (0,0)인 정규화 좌표계)
+        let rawPositions: [SIMD4<Float>] = [
+            SIMD4<Float>(-scaleX, -scaleY, 0, 1), // 좌하단
+            SIMD4<Float>(-scaleX,  scaleY, 0, 1), // 좌상단
+            SIMD4<Float>( scaleX, -scaleY, 0, 1), // 우하단
+            SIMD4<Float>( scaleX,  scaleY, 0, 1)  // 우상단
+        ]
+        
+        // 기존 텍스처 좌표 순서
+        let textureCoords: [SIMD2<Float>] = [
+            SIMD2<Float>(0, 1),
+            SIMD2<Float>(0, 0),
+            SIMD2<Float>(1, 1),
+            SIMD2<Float>(1, 0)
+        ]
+        
+        // 5. 회전 행렬을 계산하여 각 버텍스 좌표에 적용
+        let cosAngle = cos(angle)
+        let sinAngle = sin(angle)
+        let rotatedVertices: [Vertex] = zip(rawPositions, textureCoords).map { (pos, tex) in
+            let rotatedX = pos.x * cosAngle - pos.y * sinAngle
+            let rotatedY = pos.x * sinAngle + pos.y * cosAngle
+            return Vertex(position: SIMD4<Float>(rotatedX, rotatedY, pos.z, pos.w), textureCoordinate: tex)
+        }
+        
+        // 6. 새로운 버텍스 버퍼 생성 (회전된 좌표 사용)
+        let newVertexBuffer = metalDevice.makeBuffer(
+            bytes: rotatedVertices,
+            length: rotatedVertices.count * MemoryLayout<Vertex>.stride,
+            options: .storageModeShared
+        )
+        
+        // CVPixelBuffer를 Metal 텍스처로 변환
+        var cvTexture: CVMetalTexture?
+        let width = CVPixelBufferGetWidth(pixelBuffer)
+        let height = CVPixelBufferGetHeight(pixelBuffer)
+        
+        CVMetalTextureCacheCreateTextureFromImage(
+            kCFAllocatorDefault,
+            textureCache,
+            pixelBuffer,
+            nil,
+            .bgra8Unorm,
+            width,
+            height,
+            0,
+            &cvTexture
+        )
+        
+        // Metal 텍스처 생성 확인
+        guard let cvTexture = cvTexture,
+              let texture = CVMetalTextureGetTexture(cvTexture) else {
+            print("Failed to create texture from pixel buffer")
+            return
+        }
+        
+        // 렌더링 명령 인코딩
+        renderEncoder.setRenderPipelineState(pipelineState)
+        renderEncoder.setVertexBuffer(newVertexBuffer, offset: 0, index: 0)
+        renderEncoder.setFragmentTexture(texture, index: 0)
+        renderEncoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
+        renderEncoder.endEncoding()
+        
+        // 렌더링 명령을 커밋하고 결과를 화면에 표시
+        commandBuffer.present(drawable)
+        commandBuffer.commit()
+    }
+}
