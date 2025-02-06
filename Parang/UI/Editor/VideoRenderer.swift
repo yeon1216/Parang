@@ -107,8 +107,8 @@ class VideoRenderer: NSObject {
     
     /// 화면에 표시될 사각형 메시의 버텍스 버퍼 설정
     private func setupVertexBuffer() {
-        // 전체 화면을 덮는 사각형 메시 정의
-        let vertices = [
+        // 기본적으로 -1 ~ 1 범위의 정규화된 좌표계를 사용
+        var vertices = [
             // 좌하단
             Vertex(position: SIMD4<Float>(-1, -1, 0, 1), textureCoordinate: SIMD2<Float>(0, 1)),
             // 좌상단
@@ -142,6 +142,47 @@ class VideoRenderer: NSObject {
             return
         }
         
+        // 비디오 프레임의 크기 가져오기
+        let videoWidth = Float(CVPixelBufferGetWidth(pixelBuffer))
+        let videoHeight = Float(CVPixelBufferGetHeight(pixelBuffer))
+        let videoAspect = videoWidth / videoHeight
+        
+        // 뷰의 크기 가져오기
+        let viewWidth = Float(view.drawableSize.width)
+        let viewHeight = Float(view.drawableSize.height)
+        let viewAspect = viewWidth / viewHeight
+        
+        // 비디오를 화면에 맞추기 위한 스케일 계산
+        var scaleX: Float = 1.0
+        var scaleY: Float = 1.0
+        
+        if videoAspect > viewAspect {
+            // 비디오가 더 와이드한 경우
+            scaleY = viewAspect / videoAspect
+        } else {
+            // 화면이 더 와이드한 경우
+            scaleX = videoAspect / viewAspect
+        }
+        
+        // 조정된 버텍스 위치 계산
+        let vertices = [
+            // 좌하단
+            Vertex(position: SIMD4<Float>(-scaleX, -scaleY, 0, 1), textureCoordinate: SIMD2<Float>(0, 1)),
+            // 좌상단
+            Vertex(position: SIMD4<Float>(-scaleX,  scaleY, 0, 1), textureCoordinate: SIMD2<Float>(0, 0)),
+            // 우하단
+            Vertex(position: SIMD4<Float>( scaleX, -scaleY, 0, 1), textureCoordinate: SIMD2<Float>(1, 1)),
+            // 우상단
+            Vertex(position: SIMD4<Float>( scaleX,  scaleY, 0, 1), textureCoordinate: SIMD2<Float>(1, 0))
+        ]
+        
+        // 새로운 버텍스 버퍼 생성
+        let newVertexBuffer = metalDevice.makeBuffer(
+            bytes: vertices,
+            length: vertices.count * MemoryLayout<Vertex>.stride,
+            options: .storageModeShared
+        )
+        
         // CVPixelBuffer를 Metal 텍스처로 변환
         var cvTexture: CVMetalTexture?
         let width = CVPixelBufferGetWidth(pixelBuffer)
@@ -168,7 +209,7 @@ class VideoRenderer: NSObject {
         
         // 렌더링 명령 인코딩
         renderEncoder.setRenderPipelineState(pipelineState)
-        renderEncoder.setVertexBuffer(vertexBuffer, offset: 0, index: 0)
+        renderEncoder.setVertexBuffer(newVertexBuffer, offset: 0, index: 0)
         renderEncoder.setFragmentTexture(texture, index: 0)
         renderEncoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
         renderEncoder.endEncoding()
